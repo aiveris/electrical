@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="lt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2N UPS Skaičiuoklė</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center">
+
+    <div class="bg-white p-8 rounded-lg shadow-xl w-full max-w-md">
+        <h1 class="text-2xl font-bold mb-6 text-gray-800 text-center">UPS & 2N Projektuotojas</h1>
+        
+        <div class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700">IT Apkrova (kW)</label>
+                <input type="number" id="load" value="100" class="mt-1 block w-full border border-gray-300 rounded-md p-2 shadow-sm focus:ring-blue-500 focus:border-blue-500">
+            </div>
+            
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Autonomija (minutės)</label>
+                <input type="number" id="runtime" value="15" class="mt-1 block w-full border border-gray-300 rounded-md p-2 shadow-sm">
+            </div>
+
+            <button onclick="calculate()" class="w-full bg-blue-600 text-white font-bold py-2 px-4 rounded-md hover:bg-blue-700 transition duration-200">
+                Skaičiuoti Projektą
+            </button>
+        </div>
+
+        <hr class="my-6">
+
+        <div id="results" class="hidden space-y-3">
+            <h2 class="text-lg font-semibold text-gray-800">Rezultatai:</h2>
+            <div class="p-3 bg-blue-50 rounded border border-blue-200">
+                <p class="text-sm text-blue-800">Konfigūracija: <span id="config" class="font-bold"></span></p>
+                <p class="text-sm text-blue-800">UPS galia (kiekvienam šonui): <span id="ups" class="font-bold"></span> kW</p>
+                <p class="text-sm text-blue-800">Reikiama baterijų talpa: <span id="ah" class="font-bold"></span> Ah</p>
+            </div>
+        </div>
+    </div>
+<button onclick="downloadPDF()" class="w-full mt-2 bg-green-600 text-white font-bold py-2 px-4 rounded-md hover:bg-green-700 transition duration-200">
+    Atsisiųsti PDF ataskaitą
+</button>
+
+<script>
+async function downloadPDF() {
+    const load = document.getElementById('load').value;
+    const runtime = document.getElementById('runtime').value;
+
+    const response = await fetch('http://127.0.0.1:8000/generate-pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ it_load_kw: parseFloat(load), runtime_min: parseInt(runtime) })
+    });
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = "DC_Projektas.pdf";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+}
+</script>
+    <script>
+        async function calculate() {
+            const load = document.getElementById('load').value;
+            const runtime = document.getElementById('runtime').value;
+
+            const response = await fetch('http://127.0.0.1:8000/calculate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ it_load_kw: parseFloat(load), runtime_min: parseInt(runtime) })
+            });
+
+            const data = await response.json();
+            
+            if(data.status === "success") {
+                document.getElementById('results').classList.remove('hidden');
+                document.getElementById('config').innerText = data.configuration;
+                document.getElementById('ups').innerText = data.results.ups_unit_min_kw;
+                document.getElementById('ah').innerText = data.results.total_battery_ah;
+            }
+        }
+    </script>
+</body>
+</html>
