@@ -84,6 +84,29 @@
 
 .navbar-actions {
   position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Unit Toggle Button */
+.unit-toggle-btn {
+  padding: 0.25rem 0.6rem;
+  border-radius: 6px;
+  border: 1px solid var(--border-light, rgba(255, 255, 255, 0.15));
+  background: rgba(99, 102, 241, 0.15);
+  color: var(--primary-light, #818cf8);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+  letter-spacing: 0.5px;
+}
+
+.unit-toggle-btn:hover {
+  background: rgba(99, 102, 241, 0.3);
+  border-color: var(--primary-light, #818cf8);
 }
 
 /* Burger Button */
@@ -757,4 +780,77 @@ select {
   .navbar-tabs {
     display: none;
   }
+}
+
+/* ─── Converter (Imperial tab) ─── */
+.converter-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 0.75rem 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.converter-result {
+  margin-top: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: rgba(99, 102, 241, 0.1);
+  border: 1px solid rgba(99, 102, 241, 0.25);
+  border-radius: 0.5rem;
+  color: var(--primary-light);
+  font-size: 0.875rem;
+  font-weight: 500;
+  text-align: center;
+}
+
+/* AWG Table */
+.awg-table {
+  font-size: 0.8rem;
+  border-radius: 0.5rem;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.awg-table-header,
+.awg-table-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1fr;
+  gap: 0;
+}
+
+.awg-table-header {
+  background: rgba(99, 102, 241, 0.15);
+  font-weight: 600;
+  color: var(--primary-light);
+}
+
+.awg-table-header span,
+.awg-table-row span {
+  padding: 0.35rem 0.5rem;
+  border-bottom: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+}
+
+.awg-table-header span:last-child,
+.awg-table-row span:last-child {
+  border-right: none;
+}
+
+.awg-table-row:last-child span {
+  border-bottom: none;
+}
+
+.awg-table-row:nth-child(even) {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.awg-table-row span:nth-child(even) {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.awg-table-row span:nth-child(odd) {
+  color: var(--text-secondary);
 }

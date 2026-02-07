@@ -16,6 +16,26 @@ function App() {
     localStorage.setItem('theme', theme)
   }, [theme])
 
+  // ─── Unit System ───
+  const [unitSystem, setUnitSystem] = useState(() => localStorage.getItem('unitSystem') || 'metric')
+  useEffect(() => { localStorage.setItem('unitSystem', unitSystem) }, [unitSystem])
+  const isImperial = unitSystem === 'imperial'
+
+  // ─── Unit Conversion Helpers ───
+  const ftToM = (ft) => ft * 0.3048
+  const mToFt = (m) => (m / 0.3048).toFixed(2)
+  const inToMm = (inches) => inches * 25.4
+  const mmToIn = (mm) => (mm / 25.4).toFixed(3)
+  const fToC = (f) => (f - 32) * 5 / 9
+  const cToF = (c) => (c * 9 / 5 + 32).toFixed(1)
+  const sqmToSqft = (m2) => (m2 / 0.092903).toFixed(1)
+  const lToGal = (l) => (l * 0.264172).toFixed(2)
+  const closestAwg = (mm2) => {
+    let closest = awgTable[0]
+    for (const a of awgTable) { if (Math.abs(a.mm2 - mm2) < Math.abs(closest.mm2 - mm2)) closest = a }
+    return closest.awg
+  }
+
   // ═══════════════════════════════════════════════════════════════════
   // 1. POWER TAB STATE
   // ═══════════════════════════════════════════════════════════════════
@@ -124,6 +144,49 @@ function App() {
   const [motorLoading, setMotorLoading] = useState(false)
 
   // ═══════════════════════════════════════════════════════════════════
+  // 10. IMPERIAL CONVERTER STATE
+  // ═══════════════════════════════════════════════════════════════════
+  const [impAwgVal, setImpAwgVal] = useState('')
+  const [impMm2Val, setImpMm2Val] = useState('')
+  const [impFeetVal, setImpFeetVal] = useState('')
+  const [impCmVal, setImpCmVal] = useState('')
+  const [impInchVal, setImpInchVal] = useState('')
+  const [impMmVal, setImpMmVal] = useState('')
+  const [impSqftVal, setImpSqftVal] = useState('')
+  const [impSqmVal, setImpSqmVal] = useState('')
+  const [impLbVal, setImpLbVal] = useState('')
+  const [impKgVal, setImpKgVal] = useState('')
+  const [impOzVal, setImpOzVal] = useState('')
+  const [impGVal, setImpGVal] = useState('')
+  const [impMileVal, setImpMileVal] = useState('')
+  const [impKmVal, setImpKmVal] = useState('')
+  const [impFVal, setImpFVal] = useState('')
+  const [impCVal, setImpCVal] = useState('')
+
+  // AWG to mm² lookup table
+  const awgTable = [
+    { awg: '0000 (4/0)', mm2: 107.2 }, { awg: '000 (3/0)', mm2: 85.0 },
+    { awg: '00 (2/0)', mm2: 67.4 }, { awg: '0 (1/0)', mm2: 53.5 },
+    { awg: '1', mm2: 42.4 }, { awg: '2', mm2: 33.6 }, { awg: '3', mm2: 26.7 },
+    { awg: '4', mm2: 21.2 }, { awg: '5', mm2: 16.8 }, { awg: '6', mm2: 13.3 },
+    { awg: '7', mm2: 10.5 }, { awg: '8', mm2: 8.37 }, { awg: '9', mm2: 6.63 },
+    { awg: '10', mm2: 5.26 }, { awg: '11', mm2: 4.17 }, { awg: '12', mm2: 3.31 },
+    { awg: '13', mm2: 2.62 }, { awg: '14', mm2: 2.08 }, { awg: '15', mm2: 1.65 },
+    { awg: '16', mm2: 1.31 }, { awg: '17', mm2: 1.04 }, { awg: '18', mm2: 0.823 },
+    { awg: '19', mm2: 0.653 }, { awg: '20', mm2: 0.518 }, { awg: '22', mm2: 0.326 },
+    { awg: '24', mm2: 0.205 }, { awg: '26', mm2: 0.129 },
+  ]
+
+  // Conversion helpers
+  const convAwgToMm2 = (awg) => { const f = awgTable.find(a => a.awg === awg); return f ? f.mm2.toString() : '' }
+  const convMm2ToAwg = (mm2) => {
+    const v = parseFloat(mm2); if (isNaN(v)) return ''
+    let closest = awgTable[0]
+    for (const a of awgTable) { if (Math.abs(a.mm2 - v) < Math.abs(closest.mm2 - v)) closest = a }
+    return `${closest.awg} (${closest.mm2} mm²)`
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
   // AUTO-UPDATE EFFECTS
   // ═══════════════════════════════════════════════════════════════════
   useEffect(() => {
@@ -149,9 +212,10 @@ function App() {
     if (e) e.preventDefault()
     setPowerLoading(true)
     try {
+      const lengthM = isImperial ? ftToM(parseFloat(cableLength)) : parseFloat(cableLength)
       const r = await axios.post(`${API_URL}/calculate-power`, {
         load_kw: parseFloat(powerLoad), phases, cable_mm2: parseFloat(cable),
-        cable_type: cableType, length_m: parseFloat(cableLength),
+        cable_type: cableType, length_m: lengthM,
         mounting, power_factor: parseFloat(powerFactorPower)
       })
       setPowerResults(r.data)
@@ -210,10 +274,12 @@ function App() {
     if (e) e.preventDefault()
     setGenLoading(true)
     try {
+      const altM = isImperial ? ftToM(parseFloat(genAltitude)) : parseFloat(genAltitude)
+      const tempC = isImperial ? fToC(parseFloat(genTemp)) : parseFloat(genTemp)
       const r = await axios.post(`${API_URL}/calculate-generator`, {
         total_load_kw: parseFloat(genTotalLoad), motor_starting_kw: parseFloat(genMotorStarting) || 0,
-        power_factor: parseFloat(genPf), altitude_m: parseFloat(genAltitude),
-        temperature_c: parseFloat(genTemp), redundancy: genRedundancy
+        power_factor: parseFloat(genPf), altitude_m: altM,
+        temperature_c: tempC, redundancy: genRedundancy
       })
       setGenResults(r.data)
     } catch (err) {
@@ -241,9 +307,10 @@ function App() {
     if (e) e.preventDefault()
     setLightLoading(true)
     try {
+      const c = isImperial ? (v) => ftToM(v) : (v) => v
       const r = await axios.post(`${API_URL}/calculate-lighting`, {
-        room_length: parseFloat(lightLength), room_width: parseFloat(lightWidth),
-        room_height: parseFloat(lightHeight), work_plane: parseFloat(lightWorkPlane),
+        room_length: c(parseFloat(lightLength)), room_width: c(parseFloat(lightWidth)),
+        room_height: c(parseFloat(lightHeight)), work_plane: c(parseFloat(lightWorkPlane)),
         target_lux: parseFloat(lightTargetLux), luminaire_lm: parseFloat(lightLuminaireLm),
         luminaire_w: parseFloat(lightLuminaireW), maintenance_factor: parseFloat(lightMf),
         room_reflectance: lightReflectance
@@ -259,10 +326,11 @@ function App() {
     if (e) e.preventDefault()
     setGndLoading(true)
     try {
+      const spacingM = isImperial ? ftToM(parseFloat(gndSpacing)) : parseFloat(gndSpacing)
       const r = await axios.post(`${API_URL}/calculate-grounding`, {
         soil_resistivity: parseFloat(gndSoilRes), rod_length: parseFloat(gndRodLength),
         rod_diameter: parseFloat(gndRodDiameter), target_resistance: parseFloat(gndTargetR),
-        num_rods: parseInt(gndNumRods), rod_spacing: parseFloat(gndSpacing)
+        num_rods: parseInt(gndNumRods), rod_spacing: spacingM
       })
       setGndResults(r.data)
     } catch (err) {
@@ -316,6 +384,7 @@ function App() {
     { id: 'grounding', label: '🔩 Grounding' },
     { id: 'cost', label: '💰 Cost' },
     { id: 'motor', label: '⚙️ Motor' },
+    { id: 'imperial', label: '🔄 Imperial' },
     { id: 'settings', label: '🛠️ Settings' },
   ]
 
@@ -350,6 +419,9 @@ function App() {
         </div>
 
         <div className="navbar-actions">
+          <button className="unit-toggle-btn" onClick={() => setUnitSystem(isImperial ? 'metric' : 'imperial')} title={isImperial ? 'Switch to Metric' : 'Switch to Imperial'}>
+            {isImperial ? '🇺🇸 IMP' : '🇪🇺 SI'}
+          </button>
           <button className="burger-btn" onClick={() => setMenuOpen(!menuOpen)} aria-label="Menu">
             <span className="burger-line"></span>
             <span className="burger-line"></span>
@@ -405,15 +477,15 @@ function App() {
                   </select>
                 </div>
                 <div className="form-group">
-                  <label><span className="label-icon">🔗</span>Cable (mm²)</label>
+                  <label><span className="label-icon">🔗</span>Cable ({isImperial ? 'AWG ≈ mm²' : 'mm²'})</label>
                   <select value={cable} onChange={e => setCable(e.target.value)}>
                     {[1.5,2.5,4,6,10,16,25,35,50,70,95,120,150,185,240].map(s => (
-                      <option key={s} value={s}>{s} mm²</option>
+                      <option key={s} value={s}>{isImperial ? `AWG ${closestAwg(s)} (${s} mm²)` : `${s} mm²`}</option>
                     ))}
                   </select>
                 </div>
                 <div className="form-group">
-                  <label><span className="label-icon">📏</span>Length (m)</label>
+                  <label><span className="label-icon">📏</span>Length ({isImperial ? 'ft' : 'm'})</label>
                   <div className="input-wrapper">
                     <input type="number" step="1" value={cableLength} onChange={e => setCableLength(e.target.value)} placeholder="e.g. 50" required />
                   </div>
@@ -648,13 +720,13 @@ function App() {
                   </select>
                 </div>
                 <div className="form-group">
-                  <label><span className="label-icon">🏔️</span>Altitude (m)</label>
+                  <label><span className="label-icon">🏔️</span>Altitude ({isImperial ? 'ft' : 'm'})</label>
                   <div className="input-wrapper">
-                    <input type="number" step="100" value={genAltitude} onChange={e => setGenAltitude(e.target.value)} placeholder="e.g. 0" />
+                    <input type="number" step="100" value={genAltitude} onChange={e => setGenAltitude(e.target.value)} placeholder={isImperial ? 'e.g. 0' : 'e.g. 0'} />
                   </div>
                 </div>
                 <div className="form-group">
-                  <label><span className="label-icon">🌡️</span>Temperature (°C)</label>
+                  <label><span className="label-icon">🌡️</span>Temperature ({isImperial ? '°F' : '°C'})</label>
                   <div className="input-wrapper">
                     <input type="number" step="1" value={genTemp} onChange={e => setGenTemp(e.target.value)} placeholder="e.g. 40" />
                   </div>
@@ -683,7 +755,7 @@ function App() {
                     <div className="result-row-compact" style={{marginTop:'0.5rem'}}>
                       <div className="result-compact result-highlight"><span className="result-compact-label">Selected</span><span className="result-compact-value">{genResults.results.selected_kva}<span className="unit">kVA</span></span></div>
                       <div className="result-compact"><span className="result-compact-label">Units</span><span className="result-compact-value">{genResults.results.total_units}<span className="unit">×</span></span></div>
-                      <div className="result-compact"><span className="result-compact-label">Fuel</span><span className="result-compact-value">{genResults.results.fuel_lph}<span className="unit">L/h</span></span></div>
+                      <div className="result-compact"><span className="result-compact-label">Fuel</span><span className="result-compact-value">{isImperial ? lToGal(genResults.results.fuel_lph) : genResults.results.fuel_lph}<span className="unit">{isImperial ? 'gal/h' : 'L/h'}</span></span></div>
                     </div>
                     <div className="result-row-compact" style={{marginTop:'0.5rem'}}>
                       <div className="result-compact"><span className="result-compact-label">Derating</span><span className="result-compact-value">{genResults.results.derating_factor}</span></div>
@@ -775,27 +847,27 @@ function App() {
               <form onSubmit={handleLightCalc}>
                 <div className="form-row">
                   <div className="form-group">
-                    <label><span className="label-icon">📏</span>Length (m)</label>
+                    <label><span className="label-icon">📏</span>Length ({isImperial ? 'ft' : 'm'})</label>
                     <div className="input-wrapper">
-                      <input type="number" step="0.1" value={lightLength} onChange={e => setLightLength(e.target.value)} placeholder="e.g. 12" required />
+                      <input type="number" step="0.1" value={lightLength} onChange={e => setLightLength(e.target.value)} placeholder={isImperial ? 'e.g. 40' : 'e.g. 12'} required />
                     </div>
                   </div>
                   <div className="form-group">
-                    <label><span className="label-icon">📏</span>Width (m)</label>
+                    <label><span className="label-icon">📏</span>Width ({isImperial ? 'ft' : 'm'})</label>
                     <div className="input-wrapper">
-                      <input type="number" step="0.1" value={lightWidth} onChange={e => setLightWidth(e.target.value)} placeholder="e.g. 8" required />
+                      <input type="number" step="0.1" value={lightWidth} onChange={e => setLightWidth(e.target.value)} placeholder={isImperial ? 'e.g. 26' : 'e.g. 8'} required />
                     </div>
                   </div>
                 </div>
                 <div className="form-row">
                   <div className="form-group">
-                    <label>Height (m)</label>
+                    <label>Height ({isImperial ? 'ft' : 'm'})</label>
                     <div className="input-wrapper">
                       <input type="number" step="0.1" value={lightHeight} onChange={e => setLightHeight(e.target.value)} />
                     </div>
                   </div>
                   <div className="form-group">
-                    <label>Work plane (m)</label>
+                    <label>Work plane ({isImperial ? 'ft' : 'm'})</label>
                     <div className="input-wrapper">
                       <input type="number" step="0.05" value={lightWorkPlane} onChange={e => setLightWorkPlane(e.target.value)} />
                     </div>
@@ -858,12 +930,12 @@ function App() {
                     <div className="result-row-compact">
                       <div className="result-compact result-highlight"><span className="result-compact-label">Luminaires</span><span className="result-compact-value">{lightResults.results.num_luminaires}<span className="unit">pcs</span></span></div>
                       <div className="result-compact"><span className="result-compact-label">Actual</span><span className="result-compact-value">{lightResults.results.actual_lux}<span className="unit">lx</span></span></div>
-                      <div className="result-compact"><span className="result-compact-label">Area</span><span className="result-compact-value">{lightResults.results.area_m2}<span className="unit">m²</span></span></div>
+                      <div className="result-compact"><span className="result-compact-label">Area</span><span className="result-compact-value">{isImperial ? sqmToSqft(lightResults.results.area_m2) : lightResults.results.area_m2}<span className="unit">{isImperial ? 'ft²' : 'm²'}</span></span></div>
                     </div>
                     <div className="result-row-compact" style={{marginTop:'0.5rem'}}>
                       <div className="result-compact"><span className="result-compact-label">Layout</span><span className="result-compact-value">{lightResults.results.layout_rows}×{lightResults.results.layout_cols}</span></div>
                       <div className="result-compact"><span className="result-compact-label">Power</span><span className="result-compact-value">{lightResults.results.total_power_w}<span className="unit">W</span></span></div>
-                      <div className="result-compact"><span className="result-compact-label">Density</span><span className="result-compact-value">{lightResults.results.power_density_wm2}<span className="unit">W/m²</span></span></div>
+                      <div className="result-compact"><span className="result-compact-label">Density</span><span className="result-compact-value">{isImperial ? (lightResults.results.power_density_wm2 * 0.092903).toFixed(2) : lightResults.results.power_density_wm2}<span className="unit">{isImperial ? 'W/ft²' : 'W/m²'}</span></span></div>
                     </div>
                     <div className="result-row-compact" style={{marginTop:'0.5rem'}}>
                       <div className="result-compact"><span className="result-compact-label">Room Index</span><span className="result-compact-value">{lightResults.results.room_index}</span></div>
@@ -897,20 +969,20 @@ function App() {
                 </div>
                 <div className="form-row">
                   <div className="form-group">
-                    <label>Rod length (m)</label>
+                    <label>Rod length {isImperial ? '(ft)' : '(m)'}</label>
                     <select value={gndRodLength} onChange={e => setGndRodLength(e.target.value)}>
-                      <option value="1.5">1.5 m</option><option value="2">2 m</option>
-                      <option value="3">3 m</option><option value="4.5">4.5 m</option>
-                      <option value="6">6 m</option>
+                      <option value="1.5">{isImperial ? '5 ft' : '1.5 m'}</option><option value="2">{isImperial ? '6.5 ft' : '2 m'}</option>
+                      <option value="3">{isImperial ? '10 ft' : '3 m'}</option><option value="4.5">{isImperial ? '15 ft' : '4.5 m'}</option>
+                      <option value="6">{isImperial ? '20 ft' : '6 m'}</option>
                     </select>
                   </div>
                   <div className="form-group">
-                    <label>Rod Ø (mm)</label>
+                    <label>Rod Ø {isImperial ? '(in)' : '(mm)'}</label>
                     <select value={gndRodDiameter} onChange={e => setGndRodDiameter(e.target.value)}>
-                      <option value="0.014">14 mm</option>
-                      <option value="0.016">16 mm</option>
-                      <option value="0.020">20 mm</option>
-                      <option value="0.025">25 mm</option>
+                      <option value="0.014">{isImperial ? '0.55 in' : '14 mm'}</option>
+                      <option value="0.016">{isImperial ? '0.63 in' : '16 mm'}</option>
+                      <option value="0.020">{isImperial ? '0.79 in' : '20 mm'}</option>
+                      <option value="0.025">{isImperial ? '0.98 in' : '25 mm'}</option>
                     </select>
                   </div>
                 </div>
@@ -932,7 +1004,7 @@ function App() {
                     </div>
                   </div>
                   <div className="form-group">
-                    <label>Spacing (m)</label>
+                    <label>Spacing ({isImperial ? 'ft' : 'm'})</label>
                     <div className="input-wrapper">
                       <input type="number" step="0.5" value={gndSpacing} onChange={e => setGndSpacing(e.target.value)} />
                     </div>
@@ -1129,7 +1201,7 @@ function App() {
                       <div className="result-compact"><span className="result-compact-label">RPM</span><span className="result-compact-value">{motorResults.results.full_load_rpm}</span></div>
                     </div>
                     <div className="result-row-compact" style={{marginTop:'0.5rem'}}>
-                      <div className="result-compact"><span className="result-compact-label">Cable</span><span className="result-compact-value">{motorResults.results.cable_mm2}<span className="unit">mm²</span></span></div>
+                      <div className="result-compact"><span className="result-compact-label">Cable</span><span className="result-compact-value">{isImperial ? `AWG ${closestAwg(motorResults.results.cable_mm2)}` : motorResults.results.cable_mm2}<span className="unit">{isImperial ? `(${motorResults.results.cable_mm2} mm²)` : 'mm²'}</span></span></div>
                       <div className="result-compact"><span className="result-compact-label">Breaker</span><span className="result-compact-value">{motorResults.results.circuit_breaker_a}<span className="unit">A</span></span></div>
                       <div className="result-compact"><span className="result-compact-label">Contactor</span><span className="result-compact-value">{motorResults.results.contactor_a}<span className="unit">A</span></span></div>
                     </div>
@@ -1140,6 +1212,175 @@ function App() {
                 ) : <ErrorBlock detail={motorResults.detail} />}
               </div>
             )}
+          </>
+        )}
+
+        {/* ═══════════════════════════════════════════════════════════ */}
+        {/* 10. IMPERIAL CONVERTER TAB                                 */}
+        {/* ═══════════════════════════════════════════════════════════ */}
+        {activeTab === 'imperial' && (
+          <>
+            <header className="header"><h1>Imperial ⇄ Metric</h1></header>
+
+            {/* AWG ↔ mm² */}
+            <div className="card">
+              <h3 className="converter-title">🔗 Cable: AWG ↔ mm²</h3>
+              <div className="form-row">
+                <div className="form-group">
+                  <label>AWG</label>
+                  <select value={impAwgVal} onChange={e => { setImpAwgVal(e.target.value); setImpMm2Val(convAwgToMm2(e.target.value)) }}>
+                    <option value="">Select AWG...</option>
+                    {awgTable.map(a => <option key={a.awg} value={a.awg}>{a.awg}</option>)}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>mm²</label>
+                  <div className="input-wrapper">
+                    <input type="number" step="0.01" value={impMm2Val} onChange={e => { setImpMm2Val(e.target.value); setImpAwgVal('') }} placeholder="mm²" />
+                  </div>
+                </div>
+              </div>
+              {impMm2Val && !impAwgVal && (
+                <div className="converter-result">≈ {convMm2ToAwg(impMm2Val)}</div>
+              )}
+              {impAwgVal && impMm2Val && (
+                <div className="converter-result">{impAwgVal} AWG = {impMm2Val} mm²</div>
+              )}
+            </div>
+
+            {/* Length: Feet ↔ cm */}
+            <div className="card">
+              <h3 className="converter-title">📏 Length</h3>
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Feet</label>
+                  <div className="input-wrapper">
+                    <input type="number" step="0.01" value={impFeetVal} onChange={e => { setImpFeetVal(e.target.value); setImpCmVal(e.target.value ? (parseFloat(e.target.value) * 30.48).toFixed(2) : '') }} placeholder="ft" />
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label>Centimeters</label>
+                  <div className="input-wrapper">
+                    <input type="number" step="0.01" value={impCmVal} onChange={e => { setImpCmVal(e.target.value); setImpFeetVal(e.target.value ? (parseFloat(e.target.value) / 30.48).toFixed(4) : '') }} placeholder="cm" />
+                  </div>
+                </div>
+              </div>
+              <div className="form-row" style={{marginTop: '0.75rem'}}>
+                <div className="form-group">
+                  <label>Inches</label>
+                  <div className="input-wrapper">
+                    <input type="number" step="0.01" value={impInchVal} onChange={e => { setImpInchVal(e.target.value); setImpMmVal(e.target.value ? (parseFloat(e.target.value) * 25.4).toFixed(2) : '') }} placeholder="in" />
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label>Millimeters</label>
+                  <div className="input-wrapper">
+                    <input type="number" step="0.01" value={impMmVal} onChange={e => { setImpMmVal(e.target.value); setImpInchVal(e.target.value ? (parseFloat(e.target.value) / 25.4).toFixed(4) : '') }} placeholder="mm" />
+                  </div>
+                </div>
+              </div>
+              <div className="form-row" style={{marginTop: '0.75rem'}}>
+                <div className="form-group">
+                  <label>Miles</label>
+                  <div className="input-wrapper">
+                    <input type="number" step="0.01" value={impMileVal} onChange={e => { setImpMileVal(e.target.value); setImpKmVal(e.target.value ? (parseFloat(e.target.value) * 1.60934).toFixed(4) : '') }} placeholder="mi" />
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label>Kilometers</label>
+                  <div className="input-wrapper">
+                    <input type="number" step="0.01" value={impKmVal} onChange={e => { setImpKmVal(e.target.value); setImpMileVal(e.target.value ? (parseFloat(e.target.value) / 1.60934).toFixed(4) : '') }} placeholder="km" />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Area: sq ft ↔ m² */}
+            <div className="card">
+              <h3 className="converter-title">📐 Area</h3>
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Square feet</label>
+                  <div className="input-wrapper">
+                    <input type="number" step="0.01" value={impSqftVal} onChange={e => { setImpSqftVal(e.target.value); setImpSqmVal(e.target.value ? (parseFloat(e.target.value) * 0.092903).toFixed(4) : '') }} placeholder="sq ft" />
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label>Square meters</label>
+                  <div className="input-wrapper">
+                    <input type="number" step="0.01" value={impSqmVal} onChange={e => { setImpSqmVal(e.target.value); setImpSqftVal(e.target.value ? (parseFloat(e.target.value) / 0.092903).toFixed(4) : '') }} placeholder="m²" />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Weight: lbs ↔ kg, oz ↔ g */}
+            <div className="card">
+              <h3 className="converter-title">⚖️ Weight</h3>
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Pounds (lbs)</label>
+                  <div className="input-wrapper">
+                    <input type="number" step="0.01" value={impLbVal} onChange={e => { setImpLbVal(e.target.value); setImpKgVal(e.target.value ? (parseFloat(e.target.value) * 0.453592).toFixed(4) : '') }} placeholder="lbs" />
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label>Kilograms</label>
+                  <div className="input-wrapper">
+                    <input type="number" step="0.01" value={impKgVal} onChange={e => { setImpKgVal(e.target.value); setImpLbVal(e.target.value ? (parseFloat(e.target.value) / 0.453592).toFixed(4) : '') }} placeholder="kg" />
+                  </div>
+                </div>
+              </div>
+              <div className="form-row" style={{marginTop: '0.75rem'}}>
+                <div className="form-group">
+                  <label>Ounces (oz)</label>
+                  <div className="input-wrapper">
+                    <input type="number" step="0.01" value={impOzVal} onChange={e => { setImpOzVal(e.target.value); setImpGVal(e.target.value ? (parseFloat(e.target.value) * 28.3495).toFixed(2) : '') }} placeholder="oz" />
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label>Grams</label>
+                  <div className="input-wrapper">
+                    <input type="number" step="0.01" value={impGVal} onChange={e => { setImpGVal(e.target.value); setImpOzVal(e.target.value ? (parseFloat(e.target.value) / 28.3495).toFixed(4) : '') }} placeholder="g" />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Temperature: °F ↔ °C */}
+            <div className="card">
+              <h3 className="converter-title">🌡️ Temperature</h3>
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Fahrenheit (°F)</label>
+                  <div className="input-wrapper">
+                    <input type="number" step="0.1" value={impFVal} onChange={e => { setImpFVal(e.target.value); setImpCVal(e.target.value ? ((parseFloat(e.target.value) - 32) * 5/9).toFixed(2) : '') }} placeholder="°F" />
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label>Celsius (°C)</label>
+                  <div className="input-wrapper">
+                    <input type="number" step="0.1" value={impCVal} onChange={e => { setImpCVal(e.target.value); setImpFVal(e.target.value ? (parseFloat(e.target.value) * 9/5 + 32).toFixed(2) : '') }} placeholder="°C" />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* AWG Reference Table */}
+            <div className="card">
+              <h3 className="converter-title">📋 AWG Reference Table</h3>
+              <div className="awg-table">
+                <div className="awg-table-header">
+                  <span>AWG</span><span>mm²</span><span>AWG</span><span>mm²</span>
+                </div>
+                {awgTable.filter((_, i) => i % 2 === 0).map((a, i) => (
+                  <div key={i} className="awg-table-row">
+                    <span>{a.awg}</span><span>{a.mm2}</span>
+                    {awgTable[i * 2 + 1] ? <><span>{awgTable[i * 2 + 1].awg}</span><span>{awgTable[i * 2 + 1].mm2}</span></> : <><span></span><span></span></>}
+                  </div>
+                ))}
+              </div>
+            </div>
           </>
         )}
 
@@ -1162,6 +1403,20 @@ function App() {
                   <input type="checkbox" checked={theme === 'light'} onChange={() => setTheme(theme === 'dark' ? 'light' : 'dark')} />
                   <span className="toggle-slider"></span>
                   <span className="toggle-label">{theme === 'dark' ? 'Dark' : 'Light'}</span>
+                </label>
+              </div>
+              <div className="settings-item">
+                <div className="settings-label">
+                  <span className="settings-icon">📐</span>
+                  <div>
+                    <div className="settings-title">Unit System</div>
+                    <div className="settings-desc">Switch between Metric (SI) and Imperial units</div>
+                  </div>
+                </div>
+                <label className="toggle-switch">
+                  <input type="checkbox" checked={isImperial} onChange={() => setUnitSystem(isImperial ? 'metric' : 'imperial')} />
+                  <span className="toggle-slider"></span>
+                  <span className="toggle-label">{isImperial ? 'Imperial' : 'Metric'}</span>
                 </label>
               </div>
             </div>

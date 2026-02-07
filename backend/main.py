@@ -7,8 +7,9 @@ app = Flask(__name__)
 CORS(app, origins=[
     "http://localhost:5173",
     "http://localhost:3000",
-    "https://elektrotechnika.netlify.app"
-], supports_credentials=True)
+    "https://elektrotechnika.netlify.app",
+    "https://aiveris.pythonanywhere.com"
+], supports_credentials=True, methods=["GET", "POST", "OPTIONS"], allow_headers=["Content-Type", "Authorization"])
 
 @app.route('/calculate', methods=['POST'])
 def calculate():
