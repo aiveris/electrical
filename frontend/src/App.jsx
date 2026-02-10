@@ -144,7 +144,30 @@ function App() {
   const [motorLoading, setMotorLoading] = useState(false)
 
   // ═══════════════════════════════════════════════════════════════════
-  // 10. IMPERIAL CONVERTER STATE
+  // 10. DELTA U (MAX CABLE LENGTH) TAB STATE
+  // ═══════════════════════════════════════════════════════════════════
+  const [duLoad, setDuLoad] = useState('')
+  const [duPhases, setDuPhases] = useState('3F_400V')
+  const [duCable, setDuCable] = useState('2.5')
+  const [duCableType, setDuCableType] = useState('Cu')
+  const [duPf, setDuPf] = useState('0.9')
+  const [duMaxDrop, setDuMaxDrop] = useState('4')
+  const [duResults, setDuResults] = useState(null)
+  const [duLoading, setDuLoading] = useState(false)
+
+  // ═══════════════════════════════════════════════════════════════════
+  // 11. MIN IKA (MAX CABLE LENGTH BY SHORT CIRCUIT) TAB STATE
+  // ═══════════════════════════════════════════════════════════════════
+  const [ikaBreaker, setIkaBreaker] = useState('16')
+  const [ikaChar, setIkaChar] = useState('C')
+  const [ikaCable, setIkaCable] = useState('2.5')
+  const [ikaCableType, setIkaCableType] = useState('Cu')
+  const [ikaPhases, setIkaPhases] = useState('1F_230V')
+  const [ikaResults, setIkaResults] = useState(null)
+  const [ikaLoading, setIkaLoading] = useState(false)
+
+  // ═══════════════════════════════════════════════════════════════════
+  // 12. IMPERIAL CONVERTER STATE
   // ═══════════════════════════════════════════════════════════════════
   const [impAwgVal, setImpAwgVal] = useState('')
   const [impMm2Val, setImpMm2Val] = useState('')
@@ -202,6 +225,20 @@ function App() {
       return () => clearTimeout(t)
     }
   }, [powerLoad, phases, cable, cableType, cableLength, mounting, powerFactorPower])
+
+  useEffect(() => {
+    if (duResults && duLoad) {
+      const t = setTimeout(() => handleDuCalc(null), 300)
+      return () => clearTimeout(t)
+    }
+  }, [duLoad, duPhases, duCable, duCableType, duPf, duMaxDrop])
+
+  useEffect(() => {
+    if (ikaResults && ikaBreaker) {
+      const t = setTimeout(() => handleIkaCalc(null), 300)
+      return () => clearTimeout(t)
+    }
+  }, [ikaBreaker, ikaChar, ikaCable, ikaCableType, ikaPhases])
 
   // ═══════════════════════════════════════════════════════════════════
   // HANDLERS
@@ -371,6 +408,43 @@ function App() {
     } finally { setMotorLoading(false) }
   }
 
+  // 10. Delta U
+  const handleDuCalc = async (e) => {
+    if (e) e.preventDefault()
+    setDuLoading(true)
+    try {
+      const r = await axios.post(`${API_URL}/calculate-delta-u`, {
+        load_kw: parseFloat(duLoad),
+        phases: duPhases,
+        cable_mm2: parseFloat(duCable),
+        cable_type: duCableType,
+        power_factor: parseFloat(duPf),
+        max_voltage_drop_pct: parseFloat(duMaxDrop)
+      })
+      setDuResults(r.data)
+    } catch (err) {
+      setDuResults({ status: 'error', detail: err.message })
+    } finally { setDuLoading(false) }
+  }
+
+  // 11. Min Ika
+  const handleIkaCalc = async (e) => {
+    if (e) e.preventDefault()
+    setIkaLoading(true)
+    try {
+      const r = await axios.post(`${API_URL}/calculate-min-ika`, {
+        breaker_a: parseFloat(ikaBreaker),
+        characteristic: ikaChar,
+        cable_mm2: parseFloat(ikaCable),
+        cable_type: ikaCableType,
+        phases: ikaPhases
+      })
+      setIkaResults(r.data)
+    } catch (err) {
+      setIkaResults({ status: 'error', detail: err.message })
+    } finally { setIkaLoading(false) }
+  }
+
   // ═══════════════════════════════════════════════════════════════════
   // TAB CONFIG
   // ═══════════════════════════════════════════════════════════════════
@@ -384,6 +458,8 @@ function App() {
     { id: 'grounding', label: '🔩 Grounding' },
     { id: 'cost', label: '💰 Cost' },
     { id: 'motor', label: '⚙️ Motor' },
+    { id: 'deltau', label: '📏 Delta U' },
+    { id: 'minika', label: '🔥 Min Ika' },
     { id: 'imperial', label: '🔄 Imperial' },
     { id: 'settings', label: '🛠️ Settings' },
   ]
@@ -419,9 +495,6 @@ function App() {
         </div>
 
         <div className="navbar-actions">
-          <button className="unit-toggle-btn" onClick={() => setUnitSystem(isImperial ? 'metric' : 'imperial')} title={isImperial ? 'Switch to Metric' : 'Switch to Imperial'}>
-            {isImperial ? '🇺🇸 IMP' : '🇪🇺 SI'}
-          </button>
           <button className="burger-btn" onClick={() => setMenuOpen(!menuOpen)} aria-label="Menu">
             <span className="burger-line"></span>
             <span className="burger-line"></span>
@@ -1381,6 +1454,164 @@ function App() {
                 ))}
               </div>
             </div>
+          </>
+        )}
+
+        {/* ═══════════════════════════════════════════════════════════ */}
+        {/* DELTA U TAB                                                */}
+        {/* ═══════════════════════════════════════════════════════════ */}
+        {activeTab === 'deltau' && (
+          <>
+            <header className="header"><h1>Delta U – Max Cable Length</h1></header>
+            <div className="card">
+              <form onSubmit={handleDuCalc}>
+                <div className="form-group">
+                  <label><span className="label-icon">🔌</span>Load (kW)</label>
+                  <div className="input-wrapper">
+                    <input type="number" step="0.1" value={duLoad} onChange={e => setDuLoad(e.target.value)} placeholder="e.g. 10" required />
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label><span className="label-icon">⚡</span>Phases</label>
+                  <select value={duPhases} onChange={e => setDuPhases(e.target.value)}>
+                    <option value="1F_230V">1F 230V</option>
+                    <option value="3F_400V">3F 400V</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label><span className="label-icon">⚡</span>Power Factor</label>
+                  <select value={duPf} onChange={e => setDuPf(e.target.value)}>
+                    <option value="0.7">0.7</option><option value="0.8">0.8</option>
+                    <option value="0.9">0.9</option><option value="1">1.0</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label><span className="label-icon">🔗</span>Cable Type</label>
+                  <select value={duCableType} onChange={e => setDuCableType(e.target.value)}>
+                    <option value="Cu">Copper (Cu)</option><option value="Al">Aluminum (Al)</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label><span className="label-icon">🔗</span>Cable ({isImperial ? 'AWG ≈ mm²' : 'mm²'})</label>
+                  <select value={duCable} onChange={e => setDuCable(e.target.value)}>
+                    {[1.5,2.5,4,6,10,16,25,35,50,70,95,120,150,185,240].map(s => (
+                      <option key={s} value={s}>{isImperial ? `AWG ${closestAwg(s)} (${s} mm²)` : `${s} mm²`}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label><span className="label-icon">📉</span>Max Voltage Drop (%)</label>
+                  <div className="input-wrapper">
+                    <input type="number" step="0.1" value={duMaxDrop} onChange={e => setDuMaxDrop(e.target.value)} placeholder="e.g. 4" required />
+                  </div>
+                </div>
+                <button type="submit" className="btn btn-primary" disabled={duLoading}>
+                  {duLoading ? <><span className="spinner"></span>Calculating...</> : 'Calculate'}
+                </button>
+              </form>
+            </div>
+            {duResults && (
+              <div className="card results">
+                {duResults.status === 'success' ? (
+                  <>
+                    <div className="result-row-compact">
+                      <div className="result-compact">
+                        <span className="result-compact-label">Max Length</span>
+                        <span className="result-compact-value">{isImperial ? mToFt(duResults.results.max_length_m) : duResults.results.max_length_m}<span className="unit">{isImperial ? 'ft' : 'm'}</span></span>
+                      </div>
+                      <div className="result-compact">
+                        <span className="result-compact-label">Current</span>
+                        <span className="result-compact-value">{duResults.results.current_a}<span className="unit">A</span></span>
+                      </div>
+                    </div>
+                    <div className="result-row-compact" style={{marginTop:'0.5rem'}}>
+                      <div className="result-compact">
+                        <span className="result-compact-label">Voltage Drop</span>
+                        <span className="result-compact-value">{duResults.results.voltage_drop_v}<span className="unit">V</span></span>
+                      </div>
+                      <div className="result-compact">
+                        <span className="result-compact-label">Cable</span>
+                        <span className="result-compact-value">{duResults.results.cable_mm2}<span className="unit">mm²</span> {duResults.results.cable_type}</span>
+                      </div>
+                    </div>
+                  </>
+                ) : <ErrorBlock detail={duResults.detail} />}
+              </div>
+            )}
+          </>
+        )}
+
+        {/* ═══════════════════════════════════════════════════════════ */}
+        {/* MIN IKA TAB                                                */}
+        {/* ═══════════════════════════════════════════════════════════ */}
+        {activeTab === 'minika' && (
+          <>
+            <header className="header"><h1>Min Ika – Max Cable Length</h1></header>
+            <div className="card">
+              <form onSubmit={handleIkaCalc}>
+                <div className="form-group">
+                  <label><span className="label-icon">🔌</span>Circuit Breaker (A)</label>
+                  <select value={ikaBreaker} onChange={e => setIkaBreaker(e.target.value)}>
+                    {[6,10,13,16,20,25,32,40,50,63,80,100,125].map(a => (
+                      <option key={a} value={a}>{a} A</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label><span className="label-icon">📊</span>Characteristic</label>
+                  <select value={ikaChar} onChange={e => setIkaChar(e.target.value)}>
+                    <option value="B">B (3–5 × In)</option>
+                    <option value="C">C (5–10 × In)</option>
+                    <option value="D">D (10–20 × In)</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label><span className="label-icon">🔗</span>Cable Type</label>
+                  <select value={ikaCableType} onChange={e => setIkaCableType(e.target.value)}>
+                    <option value="Cu">Copper (Cu)</option><option value="Al">Aluminum (Al)</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label><span className="label-icon">🔗</span>Cable ({isImperial ? 'AWG ≈ mm²' : 'mm²'})</label>
+                  <select value={ikaCable} onChange={e => setIkaCable(e.target.value)}>
+                    {[1.5,2.5,4,6,10,16,25,35,50,70,95,120,150,185,240].map(s => (
+                      <option key={s} value={s}>{isImperial ? `AWG ${closestAwg(s)} (${s} mm²)` : `${s} mm²`}</option>
+                    ))}
+                  </select>
+                </div>
+                <button type="submit" className="btn btn-primary" disabled={ikaLoading}>
+                  {ikaLoading ? <><span className="spinner"></span>Calculating...</> : 'Calculate'}
+                </button>
+              </form>
+            </div>
+            {ikaResults && (
+              <div className="card results">
+                {ikaResults.status === 'success' ? (
+                  <>
+                    <div className="result-row-compact">
+                      <div className="result-compact">
+                        <span className="result-compact-label">Max Length</span>
+                        <span className="result-compact-value">{isImperial ? mToFt(ikaResults.results.max_length_m) : ikaResults.results.max_length_m}<span className="unit">{isImperial ? 'ft' : 'm'}</span></span>
+                      </div>
+                      <div className="result-compact">
+                        <span className="result-compact-label">Min Ika</span>
+                        <span className="result-compact-value">{ikaResults.results.ika_min_a}<span className="unit">A</span></span>
+                      </div>
+                    </div>
+                    <div className="result-row-compact" style={{marginTop:'0.5rem'}}>
+                      <div className="result-compact">
+                        <span className="result-compact-label">Multiplier</span>
+                        <span className="result-compact-value">{ikaResults.results.multiplier}<span className="unit">× In</span></span>
+                      </div>
+                      <div className="result-compact">
+                        <span className="result-compact-label">Cable</span>
+                        <span className="result-compact-value">{ikaResults.results.cable_mm2}<span className="unit">mm²</span> {ikaResults.results.cable_type}</span>
+                      </div>
+                    </div>
+                  </>
+                ) : <ErrorBlock detail={ikaResults.detail} />}
+              </div>
+            )}
           </>
         )}
 

@@ -725,6 +725,113 @@ def calculate_motor():
         return jsonify({"status": "error", "detail": str(e)}), 400
 
 
+# ─── Delta U – Maximum Cable Length ───────────────────────────────────
+@app.route('/calculate-delta-u', methods=['POST'])
+def calculate_delta_u():
+    try:
+        data = request.get_json()
+        load_kw = float(data.get('load_kw', 0))
+        phases = data.get('phases', '3F_400V')
+        cable_mm2 = float(data.get('cable_mm2', 2.5))
+        cable_type = data.get('cable_type', 'Cu')
+        power_factor = float(data.get('power_factor', 0.9))
+        max_voltage_drop_pct = float(data.get('max_voltage_drop_pct', 4.0))
+
+        # Resistivity at 70 °C (ohm·mm²/m)
+        resistivity = 0.0225 if cable_type == 'Cu' else 0.036
+
+        # Voltage
+        if phases == '1F_230V':
+            voltage = 230
+        else:
+            voltage = 400
+
+        # Current
+        if phases == '1F_230V':
+            current_a = (load_kw * 1000) / (voltage * power_factor)
+        else:
+            current_a = (load_kw * 1000) / (voltage * 1.732 * power_factor)
+
+        # Allowed voltage drop in volts
+        delta_u_v = (max_voltage_drop_pct / 100) * voltage
+
+        # Max cable length:  L = ΔU·S / (k·I·ρ)
+        #   k = 2  for single-phase,  k = √3  for three-phase
+        if phases == '1F_230V':
+            k = 2
+        else:
+            k = 1.732
+
+        if current_a <= 0:
+            return jsonify({"status": "error", "detail": "Current must be > 0"}), 400
+
+        max_length_m = (delta_u_v * cable_mm2) / (k * current_a * resistivity)
+
+        return jsonify({
+            "status": "success",
+            "results": {
+                "max_length_m": round(max_length_m, 1),
+                "current_a": round(current_a, 2),
+                "voltage_drop_v": round(delta_u_v, 2),
+                "cable_mm2": cable_mm2,
+                "cable_type": cable_type,
+                "phases": phases
+            }
+        })
+    except Exception as e:
+        return jsonify({"status": "error", "detail": str(e)}), 400
+
+
+# ─── Min Ika – Maximum Cable Length by Short Circuit ─────────────────
+@app.route('/calculate-min-ika', methods=['POST'])
+def calculate_min_ika():
+    try:
+        data = request.get_json()
+        breaker_a = float(data.get('breaker_a', 16))
+        characteristic = data.get('characteristic', 'C')  # B, C, D
+        cable_mm2 = float(data.get('cable_mm2', 2.5))
+        cable_type = data.get('cable_type', 'Cu')
+        phases = data.get('phases', '1F_230V')
+
+        # Phase voltage (for short circuit loop we always use 230V phase-to-neutral)
+        u0 = 230
+
+        # Instantaneous trip multiplier (upper bound – breaker MUST trip)
+        trip_multipliers = {'B': 5, 'C': 10, 'D': 20}
+        multiplier = trip_multipliers.get(characteristic, 10)
+
+        # Minimum short-circuit current required for guaranteed instant trip
+        ika_min = multiplier * breaker_a
+
+        # Resistivity at ~80 °C for short-circuit loop (ohm·mm²/m)
+        # Higher temp than normal operation for worst-case
+        if cable_type == 'Cu':
+            resistivity = 0.0225
+        else:
+            resistivity = 0.036
+
+        # Max cable length from Ika formula:
+        # Ika = 0.95 × U0 / (2 × ρ × L / S)
+        # L_max = 0.95 × U0 × S / (2 × ρ × Ika)
+        max_length_m = (0.95 * u0 * cable_mm2) / (2 * resistivity * ika_min)
+
+        return jsonify({
+            "status": "success",
+            "results": {
+                "max_length_m": round(max_length_m, 1),
+                "ika_min_a": round(ika_min, 1),
+                "ika_min_ka": round(ika_min / 1000, 2),
+                "breaker_a": breaker_a,
+                "characteristic": characteristic,
+                "multiplier": multiplier,
+                "cable_mm2": cable_mm2,
+                "cable_type": cable_type
+            }
+        })
+    except Exception as e:
+        return jsonify({"status": "error", "detail": str(e)}), 400
+
+
 if __name__ == "__main__":
     app.run(debug=True, port=8000, host="0.0.0.0")
 
